@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-10 12:47:44.037846",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "system_initialized",
+  "selected_modules",
+  "configuration_date",
+  "configured_by"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "system_initialized",
+   "fieldtype": "Check",
+   "label": "System Initialized"
+  },
+  {
+   "fieldname": "selected_modules",
+   "fieldtype": "Table",
+   "label": "Selected Modules",
+   "options": "ARUGA Selected Module"
+  },
+  {
+   "fieldname": "configuration_date",
+   "fieldtype": "Datetime",
+   "label": "Configuration Date"
+  },
+  {
+   "fieldname": "configured_by",
+   "fieldtype": "Link",
+   "label": "Configured By",
+   "options": "User"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-10 12:55:37.866858",
+ "modified_by": "Administrator",
+ "module": "Aruga Main",
+ "name": "ARUGA System Configuration",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
