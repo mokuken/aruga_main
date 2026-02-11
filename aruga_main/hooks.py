@@ -83,7 +83,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "aruga_main.install.before_install"
-# after_install = "aruga_main.install.after_install"
+after_install = "aruga_main.install.after_install"
 
 # Uninstallation
 # ------------
@@ -106,6 +106,20 @@ app_license = "mit"
 
 # before_app_uninstall = "aruga_main.utils.before_app_uninstall"
 # after_app_uninstall = "aruga_main.utils.after_app_uninstall"
+
+# Setup Wizard
+# ----------------
+# Add ARUGA module selection slide to the Frappe/ERPNext setup wizard.
+# The JS file adds the slide; the Python stages handle server-side activation.
+
+setup_wizard_requires = "assets/aruga_main/js/setup_wizard.js"
+setup_wizard_stages = "aruga_main.setup.setup_wizard.get_setup_stages"
+
+# Boot Session
+# ----------------
+# Filter Desk sidebar workspaces based on active ARUGA modules.
+
+extend_bootinfo = "aruga_main.boot.extend_bootinfo"
 
 # Desk Notifications
 # ------------------

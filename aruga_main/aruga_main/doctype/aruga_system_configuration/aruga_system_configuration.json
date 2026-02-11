@@ -6,40 +6,55 @@
  "engine": "InnoDB",
  "field_order": [
   "system_initialized",
-  "selected_modules",
+  "column_break_init",
   "configuration_date",
-  "configured_by"
+  "configured_by",
+  "section_break_modules",
+  "selected_modules"
  ],
  "fields": [
   {
    "default": "0",
    "fieldname": "system_initialized",
    "fieldtype": "Check",
-   "label": "System Initialized"
+   "label": "System Initialized",
+   "read_only": 1,
+   "description": "Set automatically when module selection is completed"
+  },
+  {
+   "fieldname": "column_break_init",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "configuration_date",
+   "fieldtype": "Datetime",
+   "label": "Configuration Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "configured_by",
+   "fieldtype": "Link",
+   "label": "Configured By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_modules",
+   "fieldtype": "Section Break",
+   "label": "Active Modules"
   },
   {
    "fieldname": "selected_modules",
    "fieldtype": "Table",
    "label": "Selected Modules",
    "options": "ARUGA Selected Module"
-  },
-  {
-   "fieldname": "configuration_date",
-   "fieldtype": "Datetime",
-   "label": "Configuration Date"
-  },
-  {
-   "fieldname": "configured_by",
-   "fieldtype": "Link",
-   "label": "Configured By",
-   "options": "User"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-10 12:55:37.866858",
+ "modified": "2026-02-11 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aruga Main",
  "name": "ARUGA System Configuration",
