@@ -2,6 +2,16 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("ARUGA System Configuration", {
+	after_save(frm) {
+		frappe.show_alert({
+			message: __("Cache cleared. Reloading..."),
+			indicator: "green",
+		});
+		setTimeout(() => {
+			window.location.reload();
+		}, 1500);
+	},
+
 	refresh(frm) {
 		// Add a button to add modules from the registry
 		frm.add_custom_button(__("Add Module from Registry"), function () {
