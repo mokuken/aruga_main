@@ -15,10 +15,9 @@ ARUGA_MODULES = [
 		"module_code": "aruga_accounting",
 		"module_title": "ARUGA Accounting",
 		"description": (
-			"Full accounting suite including General Ledger, Accounts Receivable/Payable, "
-			"Selling, Buying, Assets, and PH Localization (BIR Reports)."
+			"Complete accounting solution with BIR reports, financial management, and Philippine tax compliance"
 		),
-		"icon": "accounting",
+		"icon": "💰",
 		"app_name": "aruga_acct",
 		"display_order": 1,
 		"workspaces": [
@@ -44,10 +43,9 @@ ARUGA_MODULES = [
 		"module_code": "aruga_payroll",
 		"module_title": "ARUGA Payroll",
 		"description": (
-			"HR and Payroll management with PH statutory components "
-			"(SSS, PhilHealth, HDMF/Pag-IBIG)."
+			"Payroll processing with SSS, PhilHealth, Pag-IBIG reports and statutory compliance."
 		),
-		"icon": "hr",
+		"icon": "💵",
 		"app_name": "aruga_pay",
 		"display_order": 2,
 		"workspaces": [

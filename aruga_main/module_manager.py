@@ -221,3 +221,22 @@ def get_available_modules():
 				}
 			)
 	return result
+
+
+@frappe.whitelist()
+def get_all_modules():
+	"""Return list of ALL ARUGA modules with installed status."""
+	installed_apps = frappe.get_installed_apps()
+	result = []
+	for module_def in ARUGA_MODULES:
+		result.append(
+			{
+				"module_code": module_def["module_code"],
+				"module_title": module_def["module_title"],
+				"description": module_def["description"],
+				"icon": module_def.get("icon", ""),
+				"display_order": module_def["display_order"],
+				"installed": module_def["app_name"] in installed_apps
+			}
+		)
+	return result
