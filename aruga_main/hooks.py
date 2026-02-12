@@ -84,6 +84,7 @@ app_license = "mit"
 
 # before_install = "aruga_main.install.before_install"
 after_install = "aruga_main.install.after_install"
+after_migrate = "aruga_main.module_manager.apply_workspace_visibility_on_migrate"
 
 # Uninstallation
 # ------------

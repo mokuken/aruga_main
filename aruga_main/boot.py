@@ -21,17 +21,13 @@ def extend_bootinfo(bootinfo):
 	Called on every page load via the extend_bootinfo hook.
 	"""
 	try:
-		config = frappe.get_single("ARUGA System Configuration")
+		allowed_ws = _get_allowed_workspace_set()
 	except Exception:
 		# DocType may not exist yet (pre-migrate). Don't filter.
 		return
 
-	if not config.system_initialized:
-		# Setup hasn't run yet — show everything so the admin can proceed.
-		return
-
-	allowed_ws = _get_allowed_workspace_set(config)
 	if allowed_ws is None:
+		# No modules configured yet — show everything
 		return
 
 	if hasattr(bootinfo, "allowed_workspaces") and bootinfo.allowed_workspaces:
@@ -59,27 +55,27 @@ def _workspace_is_allowed(ws, allowed_ws):
 	return name in allowed_ws or title in allowed_ws
 
 
-def _get_allowed_workspace_set(config):
+def _get_allowed_workspace_set():
 	"""
 	Build a set of workspace names that should be visible based on
-	currently active modules in ARUGA System Configuration.
+	currently enabled modules in ARUGA System Configuration.
 
-	Returns None if filtering should be skipped.
+	Returns None if filtering should be skipped (no modules configured).
 	"""
-	selected_codes = {row.module_code for row in config.selected_modules}
-	if not selected_codes:
+	from aruga_main.module_manager import get_enabled_module_names
+
+	enabled = get_enabled_module_names()
+	if not enabled:
 		return None
 
-	try:
-		available = frappe.get_single("Available ARUGA Modules")
-	except Exception:
-		return None
-
+	# Get workspaces from enabled modules
 	allowed = set()
-	for module in available.available_modules:
-		if module.module_code in selected_codes:
-			workspaces_str = (module.workspaces or "").strip()
-			if workspaces_str:
-				allowed.update(ws.strip() for ws in workspaces_str.split("\n") if ws.strip())
+	workspace_rows = frappe.get_all(
+		"ARUGA Module Workspace",
+		filters={"parent": ["in", list(enabled)], "visible": 1},
+		fields=["workspace"],
+	)
+	for row in workspace_rows:
+		allowed.add(row.workspace)
 
 	return allowed

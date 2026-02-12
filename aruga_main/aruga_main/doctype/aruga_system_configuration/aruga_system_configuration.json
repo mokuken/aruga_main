@@ -1,60 +1,55 @@
 {
  "actions": [],
- "allow_rename": 1,
  "creation": "2026-02-10 12:47:44.037846",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "system_initialized",
-  "column_break_init",
-  "configuration_date",
-  "configured_by",
   "section_break_modules",
-  "selected_modules"
+  "enabled_modules",
+  "section_break_audit",
+  "last_updated_by",
+  "column_break_audit",
+  "last_updated_on"
  ],
  "fields": [
   {
-   "default": "0",
-   "fieldname": "system_initialized",
-   "fieldtype": "Check",
-   "label": "System Initialized",
-   "read_only": 1,
-   "description": "Set automatically when module selection is completed"
+   "fieldname": "section_break_modules",
+   "fieldtype": "Section Break",
+   "label": "Enabled Modules"
   },
   {
-   "fieldname": "column_break_init",
-   "fieldtype": "Column Break"
+   "fieldname": "enabled_modules",
+   "fieldtype": "Table",
+   "label": "Enabled Modules",
+   "options": "ARUGA Enabled Module"
   },
   {
-   "fieldname": "configuration_date",
-   "fieldtype": "Datetime",
-   "label": "Configuration Date",
-   "read_only": 1
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break",
+   "label": "Audit Information"
   },
   {
-   "fieldname": "configured_by",
+   "fieldname": "last_updated_by",
    "fieldtype": "Link",
-   "label": "Configured By",
+   "label": "Last Updated By",
    "options": "User",
    "read_only": 1
   },
   {
-   "fieldname": "section_break_modules",
-   "fieldtype": "Section Break",
-   "label": "Active Modules"
+   "fieldname": "column_break_audit",
+   "fieldtype": "Column Break"
   },
   {
-   "fieldname": "selected_modules",
-   "fieldtype": "Table",
-   "label": "Selected Modules",
-   "options": "ARUGA Selected Module"
+   "fieldname": "last_updated_on",
+   "fieldtype": "Datetime",
+   "label": "Last Updated On",
+   "read_only": 1
   }
  ],
- "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-11 10:00:00.000000",
+ "modified": "2026-02-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aruga Main",
  "name": "ARUGA System Configuration",
@@ -71,9 +66,8 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
- "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

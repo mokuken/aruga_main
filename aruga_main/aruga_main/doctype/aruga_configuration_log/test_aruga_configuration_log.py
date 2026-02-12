@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestAvailableARUGAModules(FrappeTestCase):
+class TestARUGAConfigurationLog(FrappeTestCase):
 	pass

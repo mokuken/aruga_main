@@ -6,7 +6,7 @@ ARUGA Setup Wizard — server-side stages.
 
 Provides get_setup_stages() which Frappe calls when the setup wizard
 completes. Handles persisting module selections and applying
-workspace/role configuration.
+workspace/role configuration using the new ARUGA Module architecture.
 """
 
 import frappe
@@ -40,20 +40,28 @@ def setup_aruga_modules(args):
 	Main task executed during the setup wizard.
 
 	Reads the selected modules from wizard form data,
-	persists them into ARUGA System Configuration,
-	and triggers workspace/role activation.
+	validates they exist as ARUGA Module records,
+	and triggers module activation with workspace visibility.
 	"""
 	if not args:
 		return
 
+	# Ensure ARUGA Module records are seeded before activation
+	from aruga_main.install import seed_aruga_modules
+	seed_aruga_modules()
+
+	# Collect selected module codes from wizard form checkboxes
 	selected_modules = []
 
-	# The wizard sends these as checkbox values: aruga_accounting, aruga_payroll
-	from aruga_main.modules_registry import ARUGA_MODULES
+	all_modules = frappe.get_all(
+		"ARUGA Module",
+		fields=["name", "module_code"],
+	)
 
-	for module_def in ARUGA_MODULES:
-		if args.get(module_def["module_code"]):
-			selected_modules.append(module_def["module_code"])
+	for mod in all_modules:
+		# The wizard sends checkbox values using module_code as fieldname
+		if args.get(mod.module_code):
+			selected_modules.append(mod.name)  # name == module_code (autoname)
 
 	if not selected_modules:
 		return

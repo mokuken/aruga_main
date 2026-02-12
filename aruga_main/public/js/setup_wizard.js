@@ -10,6 +10,8 @@
  *
  * The slide presents the available ARUGA modules as checkboxes
  * and lets the admin pick which modules to activate.
+ *
+ * Uses the new standalone ARUGA Module architecture.
  */
 
 frappe.setup.on("before_load", function () {
@@ -22,7 +24,7 @@ frappe.setup.on("before_load", function () {
 		return;
 	}
 
-	// Fetch all modules synchronously
+	// Fetch all ARUGA modules synchronously
 	let all_modules = [];
 	frappe.call({
 		method: "aruga_main.module_manager.get_all_modules",
@@ -73,10 +75,11 @@ const aruga_module_selection_slide = {
 		const cards_html = modules
 			.map((m) => {
 				const is_disabled = !m.installed;
-				const icon_content = (m.icon && m.icon.startsWith("fa-")) 
-					? `<i class="fa ${m.icon}"></i>` 
-					: (m.icon || `<i class="fa fa-cube"></i>`);
-				
+				const icon_content =
+					m.icon && m.icon.startsWith("fa-")
+						? `<i class="fa ${m.icon}"></i>`
+						: m.icon || `<i class="fa fa-cube"></i>`;
+
 				return `
 					<div class="aruga-card ${is_disabled ? "disabled" : ""}" data-module="${
 					m.module_code
@@ -84,7 +87,7 @@ const aruga_module_selection_slide = {
 						<div class="check-icon"><i class="fa fa-check-square"></i></div>
 						<div class="aruga-icon-box ${m.module_code}">${icon_content}</div>
 						<div class="aruga-card-content">
-							<div class="aruga-card-title">${__(m.module_title)}</div>
+							<div class="aruga-card-title">${__(m.module_name)}</div>
 							<div class="aruga-card-desc">${__(m.description)}</div>
 						</div>
 					</div>
@@ -122,14 +125,14 @@ const aruga_module_selection_slide = {
 					cursor: pointer;
 					position: relative;
 					transition: all 0.2s ease;
-					box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Thin shadow */
+					box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 					display: flex;
 					flex-direction: row;
 					align-items: center;
 					text-align: left;
 				}
 				.aruga-card:hover {
-					box-shadow: 0 10px 20px rgba(0,0,0,0.08); /* A bit more lift on hover */
+					box-shadow: 0 10px 20px rgba(0,0,0,0.08);
 					transform: translateY(-2px);
 				}
 				.aruga-card.selected {

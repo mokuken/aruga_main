@@ -2,146 +2,144 @@
 # For license information, please see license.txt
 
 """
-Module Manager — core activation / deactivation logic.
+Module Manager — core activation / deactivation / visibility logic.
 
 This module is called from:
 1. The setup wizard (first-time configuration)
-2. The ARUGA System Configuration doctype form (manual updates)
-3. Whitelisted API for programmatic activation
+2. The ARUGA System Configuration doctype on_update (manual changes)
+3. The after_migrate hook (ensure consistency after bench migrate)
+4. Whitelisted API for programmatic activation
 """
 
 import frappe
 from frappe import _
 
-from aruga_main.modules_registry import ARUGA_MODULES, SYSTEM_WORKSPACES
+from aruga_main.modules_registry import SYSTEM_WORKSPACES
 
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 def activate_modules(module_codes, user=None):
 	"""
 	Activate the given ARUGA module codes and deactivate the rest.
 
+	This is the main entry point called from setup wizard and API.
+	It updates both the ARUGA Module records (is_active) and
+	the ARUGA System Configuration singleton.
+
 	Args:
-	    module_codes: list of module_code strings, e.g. ["aruga_accounting", "aruga_payroll"]
-	    user: the user performing the change (defaults to current session user)
+		module_codes: list of module_code strings, e.g. ["ARUGA_ACC", "ARUGA_PAY"]
+		user: the user performing the change (defaults to current session user)
 	"""
 	if not module_codes:
 		frappe.throw(_("Please select at least one module to activate."))
 
 	user = user or frappe.session.user
+	module_codes = set(module_codes)
 
-	# Build the lookup — prefer database rows, fall back to hardcoded registry
-	db_rows = _get_db_module_rows()
-	if db_rows:
-		registry_map = {
-			row.module_code: {
-				"module_code": row.module_code,
-				"module_title": row.module_title,
-				"workspaces": [ws.strip() for ws in (row.workspaces or "").split("\n") if ws.strip()],
-				"roles": [r.strip() for r in (row.roles or "").split("\n") if r.strip()],
-			}
-			for row in db_rows
-		}
-	else:
-		registry_map = {m["module_code"]: m for m in ARUGA_MODULES}
+	# Validate all codes exist
+	for code in module_codes:
+		if not frappe.db.exists("ARUGA Module", code):
+			frappe.throw(_("Module '{0}' does not exist.").format(code))
+
+	# Update is_active flags on ARUGA Module records
+	all_modules = frappe.get_all("ARUGA Module", fields=["name", "is_core"])
+	for mod in all_modules:
+		new_active = 1 if mod.name in module_codes else 0
+		frappe.db.set_value(
+			"ARUGA Module", mod.name, "is_active", new_active, update_modified=False
+		)
 
 	# Update ARUGA System Configuration
 	config = frappe.get_single("ARUGA System Configuration")
-	config.selected_modules = []
+	config.enabled_modules = []
 
 	for code in module_codes:
-		if code not in registry_map:
-			continue
-		module_def = registry_map[code]
-		config.append(
-			"selected_modules",
-			{
-				"module_code": module_def["module_code"],
-				"module_title": module_def["module_title"],
-			},
-		)
+		config.append("enabled_modules", {"module": code, "enabled": 1})
 
-	config.system_initialized = 1
-	config.configuration_date = frappe.utils.now()
-	config.configured_by = user
-	# Prevent on_update from calling activate_modules again (infinite recursion)
-	config.flags._aruga_activating = True
+	config.last_updated_by = user
+	config.last_updated_on = frappe.utils.now()
+	# Prevent on_update from re-applying (infinite recursion guard)
+	config.flags._aruga_applying = True
 	config.save(ignore_permissions=True)
 
-	# Update Available ARUGA Modules — mark active flags
-	_update_available_module_flags(module_codes)
-
 	# Apply workspace visibility
-	_apply_workspace_visibility(module_codes, registry_map)
+	apply_workspace_visibility(module_codes)
 
 	frappe.db.commit()
 
 
 def deactivate_all_modules():
 	"""Reset system to no active modules (rarely used)."""
+	# Set all modules inactive
+	frappe.db.sql(
+		"UPDATE `tabARUGA Module` SET is_active = 0 WHERE is_core = 0"
+	)
+
 	config = frappe.get_single("ARUGA System Configuration")
-	config.selected_modules = []
-	config.system_initialized = 0
-	config.configuration_date = frappe.utils.now()
-	config.configured_by = frappe.session.user
+	config.enabled_modules = []
+	config.last_updated_by = frappe.session.user
+	config.last_updated_on = frappe.utils.now()
+	config.flags._aruga_applying = True
 	config.save(ignore_permissions=True)
 
-	_update_available_module_flags([])
 	_unhide_all_workspaces()
 	frappe.db.commit()
 
 
-def _get_db_module_rows():
-	"""Return the child rows from Available ARUGA Modules, or empty list."""
-	try:
-		doc = frappe.get_single("Available ARUGA Modules")
-		return doc.available_modules or []
-	except Exception:
-		return []
+# ---------------------------------------------------------------------------
+# Workspace Visibility
+# ---------------------------------------------------------------------------
 
-
-def _update_available_module_flags(active_codes):
-	"""Update is_active flags on Available ARUGA Modules child table."""
-	try:
-		doc = frappe.get_single("Available ARUGA Modules")
-		for row in doc.available_modules:
-			row.is_active = 1 if row.module_code in active_codes else 0
-		doc.save(ignore_permissions=True)
-	except Exception:
-		pass
-
-
-def _apply_workspace_visibility(active_codes, registry_map):
+def apply_workspace_visibility(enabled_module_names=None):
 	"""
 	Show/hide workspaces on the Desk based on active modules.
 
 	Strategy:
-	  - Identify all valid workspaces for the selected active modules
-	  - Fetch ALL public/system workspaces from the database
-	  - Hide (public=0) anything not in the active set (except system workspaces)
-	  - Show (public=1) everything in the active set
+	  - Collect all workspaces mapped to enabled modules
+	  - Always keep SYSTEM_WORKSPACES visible
+	  - Hide workspaces belonging to disabled modules
+	  - Never touch private (for_user) workspaces
+
+	Uses `is_hidden` flag — does NOT delete or modify `public` flag.
+
+	Args:
+		enabled_module_names: set/list of ARUGA Module names that are enabled.
+			If None, reads from ARUGA System Configuration.
 	"""
+	if enabled_module_names is None:
+		enabled_module_names = get_enabled_module_names()
+
+	enabled_module_names = set(enabled_module_names)
+
+	# Collect workspaces that should be visible
 	active_workspaces = set()
+	module_workspace_rows = frappe.get_all(
+		"ARUGA Module Workspace",
+		filters={"parent": ["in", list(enabled_module_names)], "visible": 1},
+		fields=["workspace"],
+	)
+	for row in module_workspace_rows:
+		active_workspaces.add(row.workspace)
 
-	# Collect allowed workspaces from the database rows first
-	db_modules = _get_db_module_rows()
-	if db_modules:
-		for row in db_modules:
-			if row.module_code in active_codes and row.workspaces:
-				ws_list = [ws.strip() for ws in row.workspaces.split("\n") if ws.strip()]
-				active_workspaces.update(ws_list)
-	else:
-		# Fallback to hardcoded registry
-		for module_def in ARUGA_MODULES:
-			if module_def["module_code"] in active_codes:
-				active_workspaces.update(module_def["workspaces"])
-
-	# Treat system workspaces as always active
+	# Always keep system workspaces visible
 	active_workspaces.update(SYSTEM_WORKSPACES)
 
-	# Fetch all existing workspaces (name, public, is_hidden, for_user)
+	# Collect ALL workspaces controlled by ANY ARUGA module (active or not)
+	all_controlled_workspaces = set()
+	all_module_ws_rows = frappe.get_all(
+		"ARUGA Module Workspace",
+		fields=["workspace"],
+	)
+	for row in all_module_ws_rows:
+		all_controlled_workspaces.add(row.workspace)
+
+	# Apply visibility changes
 	all_workspaces = frappe.get_all(
 		"Workspace",
-		fields=["name", "public", "is_hidden", "for_user"]
+		fields=["name", "public", "is_hidden", "for_user"],
 	)
 
 	for ws in all_workspaces:
@@ -152,62 +150,75 @@ def _apply_workspace_visibility(active_codes, registry_map):
 		ws_name = ws.name
 
 		if ws_name in active_workspaces:
-			# Ensure it's visible if it's currently hidden
-			if not ws.public or ws.is_hidden:
-				_set_workspace_hidden(ws_name, hidden=False)
-		else:
-			# Hide it if it's currently public
-			if ws.public:
-				_set_workspace_hidden(ws_name, hidden=True)
+			# Should be visible
+			if ws.is_hidden:
+				frappe.db.set_value(
+					"Workspace", ws_name, "is_hidden", 0, update_modified=False
+				)
+		elif ws_name in all_controlled_workspaces:
+			# Belongs to a disabled module — hide it
+			if not ws.is_hidden:
+				frappe.db.set_value(
+					"Workspace", ws_name, "is_hidden", 1, update_modified=False
+				)
+		# Workspaces not controlled by any module are left untouched
 
 
-def _set_workspace_hidden(workspace_name, hidden=True):
+def apply_workspace_visibility_on_migrate():
 	"""
-	Set the `public` flag on a Workspace document to control visibility in sidebar.
-	
-	- hidden=True  -> public=0 (hidden from sidebar)
-	- hidden=False -> public=1 (shown in sidebar)
+	Hook called after bench migrate to ensure workspace visibility
+	is consistent with the current ARUGA module configuration.
 	"""
 	try:
-		if frappe.db.exists("Workspace", workspace_name):
-			frappe.db.set_value(
-				"Workspace",
-				workspace_name,
-				"public",
-				0 if hidden else 1,
-				update_modified=False,
-			)
-			# We also ensure is_hidden is 0 so it's not double-hidden if it becomes public
-			if not hidden:
-				frappe.db.set_value(
-					"Workspace",
-					workspace_name,
-					"is_hidden",
-					0,
-					update_modified=False,
-				)
+		apply_workspace_visibility()
 	except Exception:
-		# Workspace may not exist if the app isn't installed yet — safe to skip
+		# Safe to skip if tables don't exist yet
 		pass
 
 
 def _unhide_all_workspaces():
-	"""Unhide all known module workspaces (used during deactivation)."""
-	db_modules = _get_db_module_rows()
-	if db_modules:
-		for row in db_modules:
-			if row.workspaces:
-				for ws_name in row.workspaces.split("\n"):
-					ws_name = ws_name.strip()
-					if ws_name:
-						_set_workspace_hidden(ws_name, hidden=False)
-	else:
-		for module_def in ARUGA_MODULES:
-			for ws_name in module_def["workspaces"]:
-				_set_workspace_hidden(ws_name, hidden=False)
+	"""Unhide all workspaces controlled by ARUGA modules (used during deactivation)."""
+	all_module_ws = frappe.get_all(
+		"ARUGA Module Workspace",
+		fields=["workspace"],
+	)
+	for row in all_module_ws:
+		if frappe.db.exists("Workspace", row.workspace):
+			frappe.db.set_value(
+				"Workspace", row.workspace, "is_hidden", 0, update_modified=False
+			)
 
 
-# --- Whitelisted API ---
+# ---------------------------------------------------------------------------
+# Query Helpers
+# ---------------------------------------------------------------------------
+
+def get_enabled_module_names():
+	"""Return set of enabled ARUGA Module names from System Configuration."""
+	try:
+		config = frappe.get_single("ARUGA System Configuration")
+		return {
+			row.module
+			for row in (config.enabled_modules or [])
+			if row.enabled and row.module
+		}
+	except Exception:
+		return set()
+
+
+def get_all_aruga_modules():
+	"""Return all ARUGA Module records as list of dicts."""
+	return frappe.get_all(
+		"ARUGA Module",
+		fields=["name", "module_name", "module_code", "description", "icon",
+				"is_active", "is_core", "order", "app_name"],
+		order_by="order asc",
+	)
+
+
+# ---------------------------------------------------------------------------
+# Whitelisted API
+# ---------------------------------------------------------------------------
 
 @frappe.whitelist()
 def activate_modules_api(module_codes):
@@ -215,12 +226,12 @@ def activate_modules_api(module_codes):
 	API endpoint to activate ARUGA modules.
 
 	Args:
-	    module_codes: JSON list of module_code strings
+		module_codes: JSON list of module_code strings
 	"""
-	import json
+	import json as _json
 
 	if isinstance(module_codes, str):
-		module_codes = json.loads(module_codes)
+		module_codes = _json.loads(module_codes)
 
 	if not isinstance(module_codes, list):
 		frappe.throw(_("module_codes must be a list"))
@@ -234,107 +245,69 @@ def activate_modules_api(module_codes):
 
 @frappe.whitelist()
 def get_active_modules():
-	"""Return list of currently active module codes."""
-	try:
-		config = frappe.get_single("ARUGA System Configuration")
-		return [row.module_code for row in config.selected_modules]
-	except Exception:
-		return []
+	"""Return list of currently active module codes (names)."""
+	return list(get_enabled_module_names())
 
 
 @frappe.whitelist()
 def get_available_modules():
-	"""Return list of available ARUGA modules from the database.
+	"""
+	Return list of available ARUGA modules for selection UIs.
 
-	Reads from the 'Available ARUGA Modules' Single doctype so that
-	any module added through the UI is immediately available for
-	selection in ARUGA System Configuration.
-
-	Falls back to the hardcoded ARUGA_MODULES registry if the doctype
-	has no rows yet (e.g. fresh install before seeding).
+	Only includes modules whose app is currently installed.
 	"""
 	installed_apps = frappe.get_installed_apps()
 
-	try:
-		doc = frappe.get_single("Available ARUGA Modules")
-		rows = doc.available_modules or []
-	except Exception:
-		rows = []
+	modules = frappe.get_all(
+		"ARUGA Module",
+		fields=["name", "module_name", "module_code", "description", "icon",
+				"order", "app_name", "is_active"],
+		order_by="order asc",
+	)
 
-	# If the doctype has rows, use them as the source of truth
-	if rows:
-		result = []
-		for row in rows:
-			# Only include modules whose app is installed (if app_name is set)
-			if row.app_name and row.app_name not in installed_apps:
-				continue
-			result.append(
-				{
-					"module_code": row.module_code,
-					"module_title": row.module_title,
-					"description": row.description or "",
-					"icon": row.icon or "",
-					"display_order": row.display_order or 0,
-				}
-			)
-		return sorted(result, key=lambda m: m["display_order"])
-
-	# Fallback: hardcoded registry (fresh install / empty doctype)
 	result = []
-	for module_def in ARUGA_MODULES:
-		if module_def["app_name"] in installed_apps:
-			result.append(
-				{
-					"module_code": module_def["module_code"],
-					"module_title": module_def["module_title"],
-					"description": module_def["description"],
-					"icon": module_def.get("icon", ""),
-					"display_order": module_def["display_order"],
-				}
-			)
+	for mod in modules:
+		# Only include if app is installed (or app_name is not set)
+		if mod.app_name and mod.app_name not in installed_apps:
+			continue
+		result.append({
+			"module_code": mod.module_code,
+			"module_name": mod.module_name,
+			"description": mod.description or "",
+			"icon": mod.icon or "",
+			"order": mod.order or 0,
+			"is_active": mod.is_active,
+		})
+
 	return result
 
 
 @frappe.whitelist()
 def get_all_modules():
-	"""Return list of ALL ARUGA modules with installed status.
+	"""
+	Return list of ALL ARUGA modules with installed status.
 
-	Reads from the database first; falls back to the hardcoded registry.
+	Used by the setup wizard to show all modules regardless of installation.
 	"""
 	installed_apps = frappe.get_installed_apps()
 
-	try:
-		doc = frappe.get_single("Available ARUGA Modules")
-		rows = doc.available_modules or []
-	except Exception:
-		rows = []
+	modules = frappe.get_all(
+		"ARUGA Module",
+		fields=["name", "module_name", "module_code", "description", "icon",
+				"order", "app_name", "is_active"],
+		order_by="order asc",
+	)
 
-	if rows:
-		result = []
-		for row in rows:
-			result.append(
-				{
-					"module_code": row.module_code,
-					"module_title": row.module_title,
-					"description": row.description or "",
-					"icon": row.icon or "",
-					"display_order": row.display_order or 0,
-					"installed": (row.app_name in installed_apps) if row.app_name else True,
-				}
-			)
-		return sorted(result, key=lambda m: m["display_order"])
-
-	# Fallback: hardcoded registry
 	result = []
-	for module_def in ARUGA_MODULES:
-		result.append(
-			{
-				"module_code": module_def["module_code"],
-				"module_title": module_def["module_title"],
-				"description": module_def["description"],
-				"icon": module_def.get("icon", ""),
-				"display_order": module_def["display_order"],
-				"installed": module_def["app_name"] in installed_apps
-			}
-		)
+	for mod in modules:
+		result.append({
+			"module_code": mod.module_code,
+			"module_name": mod.module_name,
+			"description": mod.description or "",
+			"icon": mod.icon or "",
+			"order": mod.order or 0,
+			"installed": (mod.app_name in installed_apps) if mod.app_name else True,
+			"is_active": mod.is_active,
+		})
+
 	return result

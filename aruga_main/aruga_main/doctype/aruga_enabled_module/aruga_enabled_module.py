@@ -1,9 +1,9 @@
 # Copyright (c) 2026, Harly Khen Quimelat and contributors
 # For license information, please see license.txt
 
-# import frappe
 from frappe.model.document import Document
 
 
-class ARUGASelectedModule(Document):
+class ARUGAEnabledModule(Document):
+	# Child table — links an ARUGA Module to ARUGA System Configuration
 	pass

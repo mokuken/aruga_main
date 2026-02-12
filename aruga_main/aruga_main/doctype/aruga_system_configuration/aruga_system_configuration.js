@@ -4,7 +4,7 @@
 frappe.ui.form.on("ARUGA System Configuration", {
 	after_save(frm) {
 		frappe.show_alert({
-			message: __("Cache cleared. Reloading..."),
+			message: __("Configuration applied. Reloading..."),
 			indicator: "green",
 		});
 		setTimeout(() => {
@@ -13,48 +13,54 @@ frappe.ui.form.on("ARUGA System Configuration", {
 	},
 
 	refresh(frm) {
-		// Add a button to add modules from the registry
-		frm.add_custom_button(__("Add Module from Registry"), function () {
-			frappe.call({
-				method: "aruga_main.module_manager.get_available_modules",
-				callback: function (r) {
-					if (!r.message || !r.message.length) {
-						frappe.msgprint(__("No ARUGA modules available in this container."));
-						return;
-					}
+		// Add button to populate from available ARUGA Module records
+		frm.add_custom_button(__("Add Module"), function () {
+			const existing = (frm.doc.enabled_modules || []).map(
+				(row) => row.module
+			);
 
-					const existing_codes = (frm.doc.selected_modules || []).map(
-						(row) => row.module_code
-					);
-					const available = r.message.filter(
-						(m) => !existing_codes.includes(m.module_code)
+			frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "ARUGA Module",
+					fields: ["name", "module_name", "is_core", "app_name"],
+					order_by: "`order` asc",
+					limit_page_length: 0,
+				},
+				callback: function (r) {
+					const all_modules = r.message || [];
+					const available = all_modules.filter(
+						(m) => !existing.includes(m.name)
 					);
 
 					if (!available.length) {
-						frappe.msgprint(__("All available modules are already selected."));
+						frappe.msgprint(
+							__("All available modules are already in the list.")
+						);
 						return;
 					}
 
-					const options = available.map((m) => m.module_title);
 					frappe.prompt(
 						{
 							fieldname: "module",
-							fieldtype: "Select",
+							fieldtype: "Link",
 							label: __("Select Module"),
-							options: options.join("\n"),
+							options: "ARUGA Module",
 							reqd: 1,
+							get_query: function () {
+								return {
+									filters: {
+										name: ["not in", existing],
+									},
+								};
+							},
 						},
 						function (values) {
-							const selected = available.find(
-								(m) => m.module_title === values.module
-							);
-							if (selected) {
-								const row = frm.add_child("selected_modules");
-								row.module_code = selected.module_code;
-								row.module_title = selected.module_title;
-								frm.refresh_field("selected_modules");
-								frm.dirty();
-							}
+							const row = frm.add_child("enabled_modules");
+							row.module = values.module;
+							row.enabled = 1;
+							frm.refresh_field("enabled_modules");
+							frm.dirty();
 						},
 						__("Add ARUGA Module"),
 						__("Add")
@@ -62,5 +68,33 @@ frappe.ui.form.on("ARUGA System Configuration", {
 				},
 			});
 		});
+
+		// Add button to view configuration history
+		frm.add_custom_button(
+			__("View Change Log"),
+			function () {
+				frappe.set_route("List", "ARUGA Configuration Log");
+			},
+			__("Actions")
+		);
+
+		// Add button to refresh module registry from installed apps
+		frm.add_custom_button(
+			__("Refresh Module Registry"),
+			function () {
+				frappe.call({
+					method: "aruga_main.install.seed_aruga_modules",
+					freeze: true,
+					freeze_message: __("Refreshing module registry..."),
+					callback: function () {
+						frm.reload_doc();
+						frappe.msgprint(
+							__("Module registry refreshed from installed apps.")
+						);
+					},
+				});
+			},
+			__("Actions")
+		);
 	},
 });

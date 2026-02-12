@@ -4,58 +4,47 @@
 """
 Central registry of ARUGA module definitions.
 
-Each entry maps an ARUGA module to its underlying Frappe app,
-the workspaces it exposes, and the roles it requires.
-This registry is used to seed the Available ARUGA Modules doctype
-and to drive workspace visibility logic.
+Each entry describes an ARUGA module: its code, human-readable name,
+the Frappe app that provides it, the workspaces it controls, etc.
+
+This registry is used to seed ARUGA Module records on install/migrate
+and to drive the setup wizard.
 """
 
 ARUGA_MODULES = [
 	{
-		"module_code": "aruga_accounting",
-		"module_title": "ARUGA Accounting",
+		"module_code": "ARUGA_ACC",
+		"module_name": "ARUGA Accounting",
 		"description": (
-			"Complete accounting solution with BIR reports, financial management, and Philippine tax compliance"
+			"Complete accounting solution with BIR reports, financial management, "
+			"and Philippine tax compliance"
 		),
 		"icon": "💰",
 		"app_name": "aruga_acct",
-		"display_order": 1,
+		"is_core": 0,
+		"order": 1,
 		"workspaces": [
 			"Accounting",
 			"Selling",
 			"Buying",
 			"Assets",
-		],
-		"roles": [
-			"Accounts Manager",
-			"Accounts User",
-			"Sales Manager",
-			"Sales Master Manager",
-			"Sales User",
-			"Purchase Manager",
-			"Purchase User",
-			"Item Manager",
-			"Stock Manager",
-			"Stock User",
+            "PH Accounting",
 		],
 	},
 	{
-		"module_code": "aruga_payroll",
-		"module_title": "ARUGA Payroll",
+		"module_code": "ARUGA_PAY",
+		"module_name": "ARUGA Payroll",
 		"description": (
-			"Payroll processing with SSS, PhilHealth, Pag-IBIG reports and statutory compliance."
+			"Payroll processing with SSS, PhilHealth, Pag-IBIG reports "
+			"and statutory compliance."
 		),
 		"icon": "💵",
 		"app_name": "aruga_pay",
-		"display_order": 2,
+		"is_core": 0,
+		"order": 2,
 		"workspaces": [
 			"HR",
 			"Payroll",
-		],
-		"roles": [
-			"HR Manager",
-			"HR User",
-			"Employee",
 		],
 	},
 ]

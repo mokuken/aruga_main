@@ -4,5 +4,6 @@
 from frappe.model.document import Document
 
 
-class AvailableARUGAModules(Document):
+class ARUGAConfigurationLog(Document):
+	"""Audit log for ARUGA module configuration changes."""
 	pass
