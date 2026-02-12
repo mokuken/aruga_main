@@ -52,7 +52,7 @@ ARUGA_MODULES = [
 # Workspaces that should always remain visible regardless of module selection.
 # These are system-level workspaces from Frappe and ERPNext core.
 SYSTEM_WORKSPACES = {
-	# "Home",
+	"Home",
 	# "Settings",
 	# "Users",
 	# "Customization",

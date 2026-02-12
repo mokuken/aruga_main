@@ -69,6 +69,32 @@ frappe.ui.form.on("ARUGA System Configuration", {
 			});
 		});
 
+		// Apply Changes — re-read module workspaces and reapply visibility
+		frm.add_custom_button(
+			__("Apply Changes"),
+			function () {
+				frappe.call({
+					method: "aruga_main.module_manager.reapply_configuration",
+					freeze: true,
+					freeze_message: __("Applying module configuration & clearing cache..."),
+					callback: function (r) {
+						if (r.message && r.message.status === "ok") {
+							frappe.show_alert({
+								message: __(
+									"Configuration applied. Reloading..."
+								),
+								indicator: "green",
+							});
+							setTimeout(() => {
+								window.location.reload();
+							}, 1000);
+						}
+					},
+				});
+			},
+			__("Actions")
+		);
+
 		// Add button to view configuration history
 		frm.add_custom_button(
 			__("View Change Log"),

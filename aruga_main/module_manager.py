@@ -127,16 +127,7 @@ def apply_workspace_visibility(enabled_module_names=None):
 	# Always keep system workspaces visible
 	active_workspaces.update(SYSTEM_WORKSPACES)
 
-	# Collect ALL workspaces controlled by ANY ARUGA module (active or not)
-	all_controlled_workspaces = set()
-	all_module_ws_rows = frappe.get_all(
-		"ARUGA Module Workspace",
-		fields=["workspace"],
-	)
-	for row in all_module_ws_rows:
-		all_controlled_workspaces.add(row.workspace)
-
-	# Apply visibility changes
+	# Apply visibility changes to ALL public workspaces
 	all_workspaces = frappe.get_all(
 		"Workspace",
 		fields=["name", "public", "is_hidden", "for_user"],
@@ -150,18 +141,22 @@ def apply_workspace_visibility(enabled_module_names=None):
 		ws_name = ws.name
 
 		if ws_name in active_workspaces:
-			# Should be visible
+			# Should be visible — ensure public=1 and is_hidden=0
+			updates = {}
+			if not ws.public:
+				updates["public"] = 1
 			if ws.is_hidden:
+				updates["is_hidden"] = 0
+			if updates:
 				frappe.db.set_value(
-					"Workspace", ws_name, "is_hidden", 0, update_modified=False
+					"Workspace", ws_name, updates, update_modified=False
 				)
-		elif ws_name in all_controlled_workspaces:
-			# Belongs to a disabled module — hide it
+		else:
+			# Not in active set — hide it
 			if not ws.is_hidden:
 				frappe.db.set_value(
 					"Workspace", ws_name, "is_hidden", 1, update_modified=False
 				)
-		# Workspaces not controlled by any module are left untouched
 
 
 def apply_workspace_visibility_on_migrate():
@@ -212,7 +207,7 @@ def get_all_aruga_modules():
 		"ARUGA Module",
 		fields=["name", "module_name", "module_code", "description", "icon",
 				"is_active", "is_core", "order", "app_name"],
-		order_by="order asc",
+		order_by="`order` asc",
 	)
 
 
@@ -244,6 +239,35 @@ def activate_modules_api(module_codes):
 
 
 @frappe.whitelist()
+def reapply_configuration():
+	"""
+	Re-read ARUGA System Configuration and reapply module states
+	and workspace visibility. Use this after editing ARUGA Module
+	workspace mappings or when the sidebar is out of sync.
+	"""
+	if "System Manager" not in frappe.get_roles():
+		frappe.throw(_("Only System Manager can apply configuration"), frappe.PermissionError)
+
+	enabled = get_enabled_module_names()
+
+	# Re-sync is_active flags
+	all_modules = frappe.get_all("ARUGA Module", fields=["name"])
+	for mod in all_modules:
+		new_active = 1 if mod.name in enabled else 0
+		frappe.db.set_value(
+			"ARUGA Module", mod.name, "is_active", new_active, update_modified=False
+		)
+
+	# Re-apply workspace visibility
+	apply_workspace_visibility(enabled)
+
+	frappe.db.commit()
+	frappe.clear_cache()
+
+	return {"status": "ok", "enabled_modules": list(enabled)}
+
+
+@frappe.whitelist()
 def get_active_modules():
 	"""Return list of currently active module codes (names)."""
 	return list(get_enabled_module_names())
@@ -262,7 +286,7 @@ def get_available_modules():
 		"ARUGA Module",
 		fields=["name", "module_name", "module_code", "description", "icon",
 				"order", "app_name", "is_active"],
-		order_by="order asc",
+		order_by="`order` asc",
 	)
 
 	result = []
@@ -295,7 +319,7 @@ def get_all_modules():
 		"ARUGA Module",
 		fields=["name", "module_name", "module_code", "description", "icon",
 				"order", "app_name", "is_active"],
-		order_by="order asc",
+		order_by="`order` asc",
 	)
 
 	result = []

@@ -33,3 +33,12 @@ class ARUGAModule(Document):
 		"""Prevent deletion of core modules."""
 		if self.is_core:
 			frappe.throw(_("Core module '{0}' cannot be deleted.").format(self.module_name))
+
+	def on_update(self):
+		"""Reapply workspace visibility when module workspaces change."""
+		if self.is_active:
+			from aruga_main.module_manager import apply_workspace_visibility
+			apply_workspace_visibility()
+			frappe.db.commit()
+		frappe.clear_cache()
+
