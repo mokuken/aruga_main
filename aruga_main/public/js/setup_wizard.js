@@ -47,7 +47,7 @@ frappe.setup.on("before_load", function () {
 				fieldname: m.module_code,
 				fieldtype: "Check",
 				hidden: 1,
-				default: m.installed ? 1 : 0,
+				default: 0,
 			});
 		});
 
@@ -84,7 +84,7 @@ const aruga_module_selection_slide = {
 					<div class="aruga-card ${is_disabled ? "disabled" : ""}" data-module="${
 					m.module_code
 				}" ${is_disabled ? 'title="' + __("App not installed") + '"' : ""}>
-						<div class="check-icon"><i class="fa fa-check-square"></i></div>
+						<div class="aruga-checkbox"><i class="fa fa-square-o"></i></div>
 						<div class="aruga-icon-box ${m.module_code}">${icon_content}</div>
 						<div class="aruga-card-content">
 							<div class="aruga-card-title">${__(m.module_name)}</div>
@@ -144,16 +144,16 @@ const aruga_module_selection_slide = {
 					pointer-events: none;
 					filter: grayscale(1);
 				}
-				.aruga-card .check-icon {
+				.aruga-card .aruga-checkbox {
 					position: absolute;
 					top: 10px;
 					right: 10px;
-					color: var(--primary-color, #2490ef);
-					display: none;
-					font-size: 16px;
+					color: var(--gray-400, #c1c1c1);
+					font-size: 18px;
+					transition: color 0.2s ease;
 				}
-				.aruga-card.selected .check-icon {
-					display: block;
+				.aruga-card.selected .aruga-checkbox {
+					color: var(--primary-color, #2490ef);
 				}
 				.aruga-icon-box {
 					width: 48px;
@@ -191,6 +191,49 @@ const aruga_module_selection_slide = {
 
 		slide.get_field("module_ui").$wrapper.html(html);
 
+		// Helper: check if any module is selected and grey-out / enable Next btn.
+		// We must always re-query the button because the framework rebuilds the
+		// footer after onload (make_prev_next_complete_buttons in Slides.refresh).
+		const enforce_next_btn_state = () => {
+			let any_selected = false;
+			modules.forEach((m) => {
+				if (get_field(m.module_code) && get_field(m.module_code).get_value()) {
+					any_selected = true;
+				}
+			});
+			const $btn = slide.slides_footer.find(".next-btn");
+			if (any_selected) {
+				$btn.removeClass("disabled").prop("disabled", false).addClass("btn-primary");
+			} else {
+				$btn.addClass("disabled").prop("disabled", true).removeClass("btn-primary");
+			}
+		};
+
+		// Override the framework's reset_action_button_state so our disable
+		// logic re-applies every time the framework recalculates button state
+		// (after show_slide → resetup_primary_button, field changes, etc.).
+		const _original_reset = slide.reset_action_button_state.bind(slide);
+		slide.reset_action_button_state = function () {
+			_original_reset();
+			enforce_next_btn_state();
+		};
+
+		// Override before_show so that EVERY TIME the slide is displayed
+		// (including navigating back via "Previous"), we schedule a deferred
+		// enforce. This is needed because Slides.refresh() fully rebuilds
+		// the footer HTML *after* show_slide/resetup, creating brand-new
+		// button elements that lose the .disabled class.
+		const _original_before_show = slide.before_show
+			? slide.before_show.bind(slide)
+			: () => {};
+		slide.before_show = function () {
+			_original_before_show();
+			setTimeout(enforce_next_btn_state, 0);
+		};
+
+		// Also catch the very first render (onload fires before show_slide).
+		setTimeout(enforce_next_btn_state, 0);
+
 		const update_card = (module) => {
 			const field = get_field(module);
 			if (!field) return;
@@ -201,12 +244,14 @@ const aruga_module_selection_slide = {
 				.$wrapper.find(`.aruga-card[data-module="${module}"]`);
 			if (is_checked) {
 				$card.addClass("selected");
+				$card.find(".aruga-checkbox i").removeClass("fa-square-o").addClass("fa-check-square");
 			} else {
 				$card.removeClass("selected");
+				$card.find(".aruga-checkbox i").removeClass("fa-check-square").addClass("fa-square-o");
 			}
 		};
 
-		// Init UI
+		// Init UI — all unselected by default
 		modules.forEach((m) => update_card(m.module_code));
 
 		// Click events
@@ -220,6 +265,7 @@ const aruga_module_selection_slide = {
 
 				field.set_input(new_val);
 				update_card(module);
+				enforce_next_btn_state();
 			});
 	},
 
