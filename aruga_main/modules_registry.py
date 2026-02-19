@@ -25,6 +25,9 @@ ARUGA_MODULES = [
 		"order": 1,
 		"workspaces": [
 			"Accounting",
+			"Payables",
+			"Receivables",
+			"Financial Reports",
 			"Selling",
 			"Buying",
 			"Assets",
@@ -44,7 +47,15 @@ ARUGA_MODULES = [
 		"order": 2,
 		"workspaces": [
 			"HR",
+			"Recruitment",
+			"Employee Lifecycle",
+			"Performance",
+			"Shift & Attendance",
+			"Expense Claims",
+			"Leaves",
 			"Payroll",
+			"Salary Payout",
+			"Tax & Benefits",
 		],
 	},
 ]
