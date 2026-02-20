@@ -1,8 +1,6 @@
 # Copyright (c) 2026, Harly Khen Quimelat and contributors
 # For license information, please see license.txt
 
-import json
-
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -39,7 +37,6 @@ class ARUGASystemConfiguration(Document):
 		if self.flags.get("_aruga_applying"):
 			return
 
-		self._log_configuration_change()
 		self._apply_module_states()
 		self._apply_workspace_visibility()
 
@@ -74,34 +71,4 @@ class ARUGASystemConfiguration(Document):
 		enabled = self._get_enabled_module_names()
 		apply_workspace_visibility(enabled)
 
-	def _log_configuration_change(self):
-		"""Create an ARUGA Configuration Log entry for audit trail."""
-		try:
-			# Get previous state
-			old_config = frappe.get_all(
-				"ARUGA Enabled Module",
-				filters={"parent": "ARUGA System Configuration", "parentfield": "enabled_modules"},
-				fields=["module", "enabled"],
-			)
-			previous = [{"module": r.module, "enabled": r.enabled} for r in old_config]
 
-			# New state from current form
-			new = [
-				{"module": row.module, "enabled": row.enabled}
-				for row in (self.enabled_modules or [])
-			]
-
-			# Only log if there's an actual change
-			if json.dumps(previous, sort_keys=True) != json.dumps(new, sort_keys=True):
-				frappe.get_doc(
-					{
-						"doctype": "ARUGA Configuration Log",
-						"changed_by": frappe.session.user,
-						"date": frappe.utils.now(),
-						"previous_config": json.dumps(previous, indent=2),
-						"new_config": json.dumps(new, indent=2),
-					}
-				).insert(ignore_permissions=True)
-		except Exception:
-			# Don't block save if logging fails
-			frappe.log_error("ARUGA Configuration Log Error")
