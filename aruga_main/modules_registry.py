@@ -56,6 +56,7 @@ ARUGA_MODULES = [
 			"Payroll",
 			"Salary Payout",
 			"Tax & Benefits",
+			"PH Payroll",
 		],
 	},
 ]
