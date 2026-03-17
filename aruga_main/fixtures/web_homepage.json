@@ -1,0 +1,24 @@
+[
+  {
+    "doctype": "Website Settings",
+    "name": "Website Settings",
+    "home_page": "home",
+    "brand_html": "<div style=\"display: flex; align-items: center;\">\n    <img style=\"margin-right: 10px;\" src=\"/files/aruga-logo.png\" />\n    <p style=\"margin-bottom:0;\">ARUGA</p>\n</div>",
+    "app_logo": "/files/aruga-logo.png",
+    "favicon": "/files/aruga-favicon.png"
+  },
+  {
+    "doctype": "Web Page",
+    "name": "ARUGA Home",
+    "title": "ARUGA Home",
+    "route": "home",
+    "published": 1,
+    "show_title": 0,
+    "content_type": "HTML",
+    "main_section_html": "<div style=\"display: flex; flex-direction: column; align-items: center;padding-top: 50px;\">\n    <img width=\"150px\" src=\"/files/aruga-logo.png\" />\n    <h1>Welcome to ARUGA Software</h1>\n    <p style=\"width: 60%;font-size: 1.5rem; text-align: center;\">ARUGA is a localized business management system designed to support the operational, financial, and workforce management needs of Philippine businesses. It provides a reliable platform that helps organizations manage key business processes efficiently while ensuring compliance with local regulations.</p>\n</div>",
+    "parent_website_route": "",
+    "meta_title": "ARUGA Home",
+    "meta_description": "ARUGA is a localized business management system for Philippine businesses.",
+    "idx": 1
+  }
+]

@@ -14,8 +14,54 @@ from aruga_main.modules_registry import ARUGA_MODULES
 
 
 def after_install():
-	"""Called after aruga_main is installed. Seeds ARUGA Module records."""
+	"""Called after aruga_main is installed.
+
+	Seeds ARUGA Module records and ensures the ARUGA logo is available under
+	`/files/aruga-logo.png` (used by fixtures / website settings).
+	"""
 	seed_aruga_modules()
+	_ensure_site_logo()
+
+
+def _ensure_site_logo():
+	"""Ensure the ARUGA logo is copied into the current site's public files.
+
+	Frappe serves `/files/<filename>` from `sites/<site>/public/files`. Some
+	website templates reference the logo via `/files/aruga-logo.png`, so we
+	ensure it exists there on install.
+	"""
+
+	import os
+	import shutil
+
+	src = frappe.get_app_path("aruga_main", "public", "img", "aruga-logo.png")
+	dest = frappe.get_site_path("public", "files", "aruga-logo.png")
+
+	if os.path.exists(src):
+		os.makedirs(os.path.dirname(dest), exist_ok=True)
+		if not os.path.exists(dest):
+			shutil.copy(src, dest)
+
+	# Also make the favicon available via /files/
+	favicon_src = frappe.get_app_path("aruga_main", "public", "img", "aruga-favicon.png")
+	favicon_dest = frappe.get_site_path("public", "files", "aruga-favicon.png")
+	if os.path.exists(favicon_src):
+		if not os.path.exists(favicon_dest):
+			shutil.copy(favicon_src, favicon_dest)
+
+	# Only set the website settings logo / favicon if unset or still using the ERPNext defaults.
+	try:
+		ws = frappe.get_single("Website Settings")
+		if not ws.app_logo or "erpnext-logo" in (ws.app_logo or ""):
+			ws.app_logo = "/files/aruga-logo.png"
+
+		# ERPNext defaults to /assets/erpnext/images/favicon.ico
+		if not ws.favicon or "favicon.ico" in (ws.favicon or ""):
+			ws.favicon = "/files/aruga-favicon.png"
+
+		ws.save(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "aruga_main.install._ensure_site_logo")
 
 
 @frappe.whitelist()

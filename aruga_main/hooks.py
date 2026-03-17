@@ -5,6 +5,15 @@ app_description = "System-wide configuration for ARUGA modules"
 app_email = "harlykhen@gmail.com"
 app_license = "mit"
 
+# Fixtures
+# --------
+fixtures = [
+	"Website Settings",
+	"Web Page",
+	{"dt": "Website Settings", "json": "aruga_main/aruga_main/fixtures/web_homepage.json"},
+	{"dt": "Web Page", "json": "aruga_main/aruga_main/fixtures/web_homepage.json"},
+]
+
 # Apps
 # ------------------
 
